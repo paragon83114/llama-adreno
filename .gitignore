@@ -6,3 +6,4 @@ src/
 server.log
 *.bin
 *.gguf
+server-latest.log

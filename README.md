@@ -154,6 +154,7 @@ Android/Termux lacks `posix_spawn`. `setup.sh` writes a compatibility shim (`spa
 | tg regression on larger models | CPU-GPU sync overhead per token; mitigated on smaller models |
 | `--mlock` OOM | Causes OOM with GPU offload on 12 GB RAM |
 | posix_spawn missing | Requires manual polyfill for `llama-server` compilation |
+| Moving directory after build | Binaries have RUNPATH hardcoded at compile time — **recompile** or fix with `patchelf --set-rpath` |
 
 ## Upcoming improvements
 
