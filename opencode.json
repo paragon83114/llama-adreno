@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "llama-local/qwen2.5-coder-1.5b",
+  "small_model": "llama-local/qwen2.5-coder-1.5b",
+  "provider": {
+    "llama-local": {
+      "name": "llama.cpp (local)",
+      "api": "openai-compatible",
+      "options": {
+        "baseURL": "http://127.0.0.1:8080/v1",
+        "apiKey": "none"
+      },
+      "models": {
+        "qwen2.5-coder-1.5b": {
+          "name": "Qwen2.5-Coder-1.5B (local)",
+          "limit": {
+            "context": 16384,
+            "output": 4096
+          },
+          "tool_call": true,
+          "temperature": true
+        }
+      }
+    }
+  }
+}

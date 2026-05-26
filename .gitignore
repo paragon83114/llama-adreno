@@ -1,0 +1,8 @@
+models/
+cache/
+logs/
+backup/
+src/
+server.log
+*.bin
+*.gguf
