@@ -247,7 +247,16 @@ SPAWN_H
 
     cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
-        -DGGML_NATIVE=ON \
+        -DGGML_NATIVE=OFF \
+        -DGGML_CPU_ARM_ARCH=armv8.6-a+dotprod+fp16+i8mm \
+        -DGGML_CPU_KLEIDIAI=ON \
+        -DGGML_LTO=ON \
+        -DGGML_LLAMAFILE=ON \
+        -DGGML_OPENMP=ON \
+        -DGGML_CPU_REPACK=ON \
+        -DGGML_OPENCL=ON \
+        -DGGML_OPENCL_USE_ADRENO_KERNELS=ON \
+        -DOpenCL_LIBRARY="$PREFIX/lib/libOpenCL.so" \
         -DLLAMA_BUILD_TESTS=OFF \
         -DLLAMA_BUILD_SERVER=ON \
         -DLLAMA_BUILD_APP=OFF
@@ -287,37 +296,67 @@ crear_script_chat() {
     local modelo_path="$2"
     local chat_script="$HOME/llama-adreno/chat.sh"
 
-    cat > "$chat_script" << CHAT_EOF
+    cat > "$chat_script" << 'CHAT_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
-if [ -z "\${PREFIX:-}" ]; then
-    echo "Error: Este script requiere Termux." >&2
+if [ -z "${PREFIX:-}" ]; then
+    printf "\033[1;31m✗ Este script requiere Termux.\033[0m\n" >&2
     exit 1
 fi
 
-LLAMA_BIN="\$HOME/llama-adreno/src/build/bin/llama-cli"
-MODELO="\$HOME/llama-adreno/models/Qwen3.5-4B-Q4_K_M.gguf"
+LLAMA_BIN="$HOME/llama-adreno/src/build/bin/llama-cli"
+MODELO="$HOME/llama-adreno/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf"
 
-if [ ! -f "\$LLAMA_BIN" ]; then
-    echo "Error: llama-cli no encontrado. Ejecuta primero: bash ~/llama-adreno/setup.sh" >&2
+if [ ! -f "$LLAMA_BIN" ]; then
+    printf "\033[1;31m✗ llama-cli no encontrado. Ejecuta: bash ~/llama-adreno/setup.sh\033[0m\n" >&2
     exit 1
 fi
 
-if [ ! -f "\$MODELO" ]; then
-    echo "Error: Modelo no encontrado. Ejecuta primero: bash ~/llama-adreno/setup.sh" >&2
+if [ ! -f "$MODELO" ]; then
+    printf "\033[1;31m✗ Modelo no encontrado: %s\033[0m\n" "$(basename "$MODELO")" >&2
+    printf "\n" >&2
+    printf "\033[1mDescárgalo con:\033[0m\n" >&2
+    printf "  curl -L -o ~/llama-adreno/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf \\\\\n" >&2
+    printf '    "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf"\n' >&2
+    printf "\n" >&2
+    printf "\033[2mO ejecuta: bash ~/llama-adreno/download-model.sh\033[0m\n" >&2
     exit 1
 fi
 
-"\$LLAMA_BIN" \\
-    --model "\$MODELO" \\
-    --threads 4 \\
-    --ctx-size 16384 \\
-    --temp 0.7 \\
-    --top-p 0.9 \\
-    --repeat-penalty 1.1 \\
-    --prompt "\$*" \\
-    --n-predict 512
+BOLD="\033[1m"
+DIM="\033[2m"
+GREEN="\033[1;32m"
+CYAN="\033[1;36m"
+RESET="\033[0m"
+
+printf "\n${CYAN}${BOLD}▗▖▗▖▗▖▖▗▖▗▗▖▗▖${RESET}\n"
+printf "${CYAN}${BOLD}▗▖▘▐ ▘▐ ▐ ▘▐ ▗▗▖${RESET}  ${BOLD}llama-cli${RESET} ${DIM}for Termux${RESET}\n"
+printf "${CYAN}${BOLD}▝▘ ▝ ▝▘▘ ▝▘ ▝▝ ▝▘${RESET}  ${DIM}Qwen2.5-Coder-1.5B · Adreno 830${RESET}\n"
+printf "\n"
+printf "  ${GREEN}▸${RESET} Modelo    ${DIM}$(basename "$MODELO")${RESET}\n"
+printf "  ${GREEN}▸${RESET} CPU       6 hilos · cores 0-5\n"
+printf "  ${GREEN}▸${RESET} GPU       Adreno 830 · -ngl 99\n"
+printf "  ${GREEN}▸${RESET} GPU       Adreno 830 activa (prefill acelerado)\n"
+printf "\n"
+printf "Escribe tu mensaje. Ctrl+C para salir.\n\n"
+
+LD_LIBRARY_PATH=/vendor/lib64:$PREFIX/lib:${LD_LIBRARY_PATH:-} "$LLAMA_BIN" \
+    --model "$MODELO" \
+    --threads 6 \
+    --threads-batch 6 \
+    -C 0x3f --cpu-strict 1 \
+    -ngl 99 \
+    -ctk f16 -ctv f16 \
+    --batch-size 2048 \
+    --ctx-size 32764 \
+    --temp 0.7 \
+    --top-p 0.9 \
+    --repeat-penalty 1.1 \
+    --keep -1 \
+    --conversation \
+    --color on \
+    --no-display-prompt
 CHAT_EOF
 
     chmod +x "$chat_script"
@@ -329,39 +368,154 @@ crear_script_server() {
     local modelo_path="$2"
     local server_script="$HOME/llama-adreno/server.sh"
 
-    cat > "$server_script" << SERVER_EOF
+    cat > "$server_script" << 'SERVER_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
-if [ -z "\${PREFIX:-}" ]; then
-    echo "Error: Este script requiere Termux." >&2
+if [ -z "${PREFIX:-}" ]; then
+    printf "\033[1;31m✗ Este script requiere Termux.\033[0m\n" >&2
     exit 1
 fi
 
-LLAMA_BIN="\$HOME/llama-adreno/src/build/bin/llama-server"
-MODELO="\$HOME/llama-adreno/models/Qwen3.5-4B-Q4_K_M.gguf"
+LLAMA_BIN="$HOME/llama-adreno/src/build/bin/llama-server"
+MODELO="$HOME/llama-adreno/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf"
+CACHE_DIR="$HOME/llama-adreno/cache"
+CACHE_FILE="$CACHE_DIR/slot0.bin"
+LOG_DIR="$HOME/llama-adreno/logs"
+LOG_FILE="$LOG_DIR/server-$(date +%Y%m%d-%H%M%S).log"
+LOG_LATEST="$LOG_DIR/server-latest.log"
 
-if [ ! -f "\$LLAMA_BIN" ]; then
-    echo "Error: llama-server no encontrado." >&2
+mkdir -p "$CACHE_DIR" "$LOG_DIR"
+
+if [ ! -f "$LLAMA_BIN" ]; then
+    printf "\033[1;31m✗ llama-server no encontrado. Ejecuta: bash ~/llama-adreno/setup.sh\033[0m\n" >&2
     exit 1
 fi
 
-if [ ! -f "\$MODELO" ]; then
-    echo "Error: Modelo no encontrado." >&2
+if [ ! -f "$MODELO" ]; then
+    printf "\033[1;31m✗ Modelo no encontrado: %s\033[0m\n" "$(basename "$MODELO")" >&2
+    printf "\n" >&2
+    printf "\033[1mDescárgalo con:\033[0m\n" >&2
+    printf "  curl -L -o ~/llama-adreno/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf \\\\\n" >&2
+    printf '    "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf"\n' >&2
+    printf "\n" >&2
+    printf "\033[2mO ejecuta: bash ~/llama-adreno/download-model.sh\033[0m\n" >&2
     exit 1
 fi
 
-echo "Iniciando servidor OpenAI-compatible en http://127.0.0.1:8080"
-echo "Configura opencode con:"
-echo '  "api_base": "http://127.0.0.1:8080/v1"'
-echo '  "api_key": "none"'
+BOLD="\033[1m"
+DIM="\033[2m"
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+CYAN="\033[1;36m"
+RESET="\033[0m"
 
-"\$LLAMA_BIN" \\
-    --model "\$MODELO" \\
-    --threads 4 \\
-    --ctx-size 16384 \\
-    --host 127.0.0.1 \\
-    --port 8080
+printf "\n${CYAN}${BOLD}▗▖▗▖▗▖▖▗▖▗▗▖▗▖${RESET}\n"
+printf "${CYAN}${BOLD}▗▖▘▐ ▘▐ ▐ ▘▐ ▗▗▖${RESET}  ${BOLD}llama-server${RESET} ${DIM}for Termux${RESET}\n"
+printf "${CYAN}${BOLD}▝▘ ▝ ▝▘▘ ▝▘ ▝▝ ▝▘${RESET}  ${DIM}Qwen2.5-Coder-1.5B · Adreno 830${RESET}\n"
+printf "\n"
+
+printf "  ${GREEN}▸${RESET} Endpoint  ${BOLD}http://127.0.0.1:8080/v1${RESET}\n"
+printf "  ${GREEN}▸${RESET} Modelo    ${DIM}$(basename "$MODELO")${RESET}\n"
+printf "  ${GREEN}▸${RESET} CPU       6 hilos · cores 0-5 · máscara 0x3f\n"
+printf "  ${GREEN}▸${RESET} GPU       Adreno 830 · -ngl 99\n"
+printf "  ${GREEN}▸${RESET} KV Cache  f16 · ctx 16384\n"
+printf "  ${GREEN}▸${RESET} Log       ${DIM}${LOG_LATEST}${RESET}\n"
+printf "\n"
+
+guardar_y_salir() {
+    printf "\n\n${YELLOW}⟳${RESET} Guardando caché KV...\n"
+    local save_resp
+    save_resp=$(curl -s -X POST "http://127.0.0.1:8080/slots/0?action=save" \
+         -H "Content-Type: application/json" \
+         -d '{"filename": "slot0.bin"}' 2>/dev/null || true)
+    if echo "$save_resp" | grep -q "n_saved"; then
+        printf "${GREEN}✓${RESET} Caché guardado\n"
+    else
+        printf "${RED}✗${RESET} No se pudo guardar el caché\n"
+    fi
+
+    printf "${YELLOW}⟳${RESET} Apagando servidor (PID %s)...\n" "$SERVER_PID"
+    kill "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+    printf "${GREEN}✓${RESET} Servidor detenido\n"
+
+    if [ -L "$LOG_LATEST" ]; then
+        local log_size
+        log_size=$(wc -c < "$LOG_LATEST" 2>/dev/null || echo "?")
+        printf "${DIM}  Log: %s (%s bytes)${RESET}\n" "$(basename "$LOG_LATEST")" "$log_size"
+    fi
+
+    exit 0
+}
+
+trap guardar_y_salir SIGINT SIGTERM
+
+printf "${DIM}  Redirigiendo logs de llama-server a archivo...${RESET}\n"
+ln -sf "$LOG_FILE" "$LOG_LATEST"
+
+LD_LIBRARY_PATH=/vendor/lib64:$PREFIX/lib:${LD_LIBRARY_PATH:-} "$LLAMA_BIN" \
+    --model "$MODELO" \
+    --threads 6 \
+    --threads-batch 6 \
+    -C 0x3f --cpu-strict 1 \
+    -ngl 99 \
+    -ctk f16 -ctv f16 \
+    --numa distribute \
+    --batch-size 2048 \
+    --ctx-size 16384 \
+    --parallel 1 \
+    --kv-unified \
+    --slot-save-path "$CACHE_DIR/" \
+    --host 127.0.0.1 \
+    --port 8080 \
+    >> "$LOG_FILE" 2>&1 &
+
+SERVER_PID=$!
+
+printf "${YELLOW}⟳${RESET} Cargando modelo"
+for i in {1..60}; do
+    if curl -s "http://127.0.0.1:8080/health" > /dev/null 2>&1; then
+        printf "\n${GREEN}✓${RESET} Servidor en línea\n"
+        break
+    fi
+    printf "."
+    sleep 1
+done
+
+if ! curl -s "http://127.0.0.1:8080/health" > /dev/null 2>&1; then
+    printf "\n${RED}✗${RESET} El servidor no respondió en 60s. Revisa el log:\n"
+    printf "  ${DIM}tail -f %s${RESET}\n" "$LOG_LATEST"
+    exit 1
+fi
+
+if [ -f "$CACHE_FILE" ]; then
+    printf "${YELLOW}⟳${RESET} Restaurando caché KV previo...\n"
+    for i in {1..20}; do
+        HEALTH=$(curl -s "http://127.0.0.1:8080/health" 2>/dev/null)
+        if echo "$HEALTH" | grep -q '"status":"ok"'; then
+            RESTORE_RESP=$(curl -s -X POST "http://127.0.0.1:8080/slots/0?action=restore" \
+                 -H "Content-Type: application/json" \
+                 -d '{"filename": "slot0.bin"}' 2>/dev/null || true)
+            if echo "$RESTORE_RESP" | grep -q "n_restored"; then
+                printf "${GREEN}✓${RESET} Caché restaurado\n"
+                break
+            else
+                sleep 2
+            fi
+        else
+            sleep 2
+        fi
+    done
+else
+    printf "${DIM}  Sin caché previo — inicio en frío${RESET}\n"
+fi
+
+printf "\n${BOLD}Listo.${RESET} Ctrl+C para detener y guardar.\n"
+printf "${DIM}  Ver log en vivo: tail -f %s${RESET}\n\n" "$LOG_LATEST"
+
+wait "$SERVER_PID"
 SERVER_EOF
 
     chmod +x "$server_script"
