@@ -8,13 +8,11 @@ fi
 
 LLAMA_BIN="$HOME/llama-adreno/src/build/bin/llama-server"
 MODELO="$HOME/llama-adreno/models/qwen2.5-coder-1.5b-instruct-q8_0.gguf"
-CACHE_DIR="$HOME/llama-adreno/cache"
-CACHE_FILE="$CACHE_DIR/slot0.bin"
 LOG_DIR="$HOME/llama-adreno/logs"
 LOG_FILE="$LOG_DIR/server-$(date +%Y%m%d-%H%M%S).log"
 LOG_LATEST="$LOG_DIR/server-latest.log"
 
-mkdir -p "$CACHE_DIR" "$LOG_DIR"
+mkdir -p "$LOG_DIR"
 
 if [ ! -f "$LLAMA_BIN" ]; then
     printf "\033[1;31m✗ llama-server no encontrado. Ejecuta: bash ~/llama-adreno/setup.sh\033[0m\n" >&2
@@ -40,8 +38,7 @@ YELLOW="\033[1;33m"
 CYAN="\033[1;36m"
 RESET="\033[0m"
 
-printf "\n${CYAN}${BOLD}▗▖▗▖▗▖▖▗▖▗▗▖▗▖${RESET}\n"
-printf "${CYAN}${BOLD}▗▖▘▐ ▘▐ ▐ ▘▐ ▗▗▖${RESET}  ${BOLD}llama-server${RESET} ${DIM}for Termux${RESET}\n"
+printf "\n${CYAN}${BOLD}▗▖▗▗▖▗▖▘▐ ${RESET}${BOLD}llama-server${RESET} ${DIM}for Termux${RESET}\n"
 printf "${CYAN}${BOLD}▝▘ ▝ ▝▘▘ ▝▘ ▝▝ ▝▘${RESET}  ${DIM}Qwen2.5-Coder-1.5B · Adreno 830${RESET}\n"
 printf "\n"
 
@@ -49,23 +46,13 @@ printf "  ${GREEN}▸${RESET} Endpoint  ${BOLD}http://127.0.0.1:8080/v1${RESET}\
 printf "  ${GREEN}▸${RESET} Modelo    ${DIM}$(basename "$MODELO")${RESET}\n"
 printf "  ${GREEN}▸${RESET} CPU       4 hilos · cores 0-3 · máscara 0xf\n"
 printf "  ${GREEN}▸${RESET} GPU       Adreno 830 · -ngl 99\n"
-printf "  ${GREEN}▸${RESET} KV Cache  f16 · ctx 16384\n"
+printf "  ${GREEN}▸${RESET} KV Cache  f16 · ctx 32764\n"
+printf "  ${GREEN}▸${RESET} Slots     1 (dedicado, sin competencia GPU)\n"
 printf "  ${GREEN}▸${RESET} Log       ${DIM}${LOG_LATEST}${RESET}\n"
 printf "\n"
 
-guardar_y_salir() {
-    printf "\n\n${YELLOW}⟳${RESET} Guardando caché KV...\n"
-    local save_resp
-    save_resp=$(curl -s -X POST "http://127.0.0.1:8080/slots/0?action=save" \
-         -H "Content-Type: application/json" \
-         -d '{"filename": "slot0.bin"}' 2>/dev/null || true)
-    if echo "$save_resp" | grep -q "n_saved"; then
-        printf "${GREEN}✓${RESET} Caché guardado\n"
-    else
-        printf "${RED}✗${RESET} No se pudo guardar el caché\n"
-    fi
-
-    printf "${YELLOW}⟳${RESET} Apagando servidor (PID %s)...\n" "$SERVER_PID"
+apagar() {
+    printf "\n\n${YELLOW}⟳${RESET} Apagando servidor (PID %s)...\n" "$SERVER_PID"
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
     printf "${GREEN}✓${RESET} Servidor detenido\n"
@@ -79,7 +66,7 @@ guardar_y_salir() {
     exit 0
 }
 
-trap guardar_y_salir SIGINT SIGTERM
+trap apagar SIGINT SIGTERM
 
 printf "${DIM}  Redirigiendo logs de llama-server a archivo...${RESET}\n"
 ln -sf "$LOG_FILE" "$LOG_LATEST"
@@ -93,10 +80,14 @@ LD_LIBRARY_PATH=/vendor/lib64:$PREFIX/lib:${LD_LIBRARY_PATH:-} "$LLAMA_BIN" \
     -ctk f16 -ctv f16 \
     --numa distribute \
     --batch-size 2048 \
-    --ctx-size 16384 \
+    --ubatch-size 512 \
+    --ctx-size 32764 \
     --parallel 1 \
+    --cont-batching \
+    --cache-idle-slots \
+    --cache-ram 1024 \
     --kv-unified \
-    --slot-save-path "$CACHE_DIR/" \
+    --timeout 600 \
     --host 127.0.0.1 \
     --port 8080 \
     >> "$LOG_FILE" 2>&1 &
@@ -119,29 +110,7 @@ if ! curl -s "http://127.0.0.1:8080/health" > /dev/null 2>&1; then
     exit 1
 fi
 
-if [ -f "$CACHE_FILE" ]; then
-    printf "${YELLOW}⟳${RESET} Restaurando caché KV previo...\n"
-    for i in {1..20}; do
-        HEALTH=$(curl -s "http://127.0.0.1:8080/health" 2>/dev/null)
-        if echo "$HEALTH" | grep -q '"status":"ok"'; then
-            RESTORE_RESP=$(curl -s -X POST "http://127.0.0.1:8080/slots/0?action=restore" \
-                 -H "Content-Type: application/json" \
-                 -d '{"filename": "slot0.bin"}' 2>/dev/null || true)
-            if echo "$RESTORE_RESP" | grep -q "n_restored"; then
-                printf "${GREEN}✓${RESET} Caché restaurado\n"
-                break
-            else
-                sleep 2
-            fi
-        else
-            sleep 2
-        fi
-    done
-else
-    printf "${DIM}  Sin caché previo — inicio en frío${RESET}\n"
-fi
-
-printf "\n${BOLD}Listo.${RESET} Ctrl+C para detener y guardar.\n"
+printf "\n${BOLD}Listo.${RESET} Ctrl+C para detener.\n"
 printf "${DIM}  Ver log en vivo: tail -f %s${RESET}\n\n" "$LOG_LATEST"
 
 wait "$SERVER_PID"

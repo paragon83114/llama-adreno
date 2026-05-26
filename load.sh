@@ -6,11 +6,8 @@ if [ -z "${PREFIX:-}" ]; then
     exit 1
 fi
 
-echo "Restaurando caché del prompt del servidor..."
-
-curl -X POST "http://127.0.0.1:8080/slots/0?action=restore" \
-     -H "Content-Type: application/json" \
-     -d '{"filename": "slot0.bin"}'
-
+echo "El prompt cache ahora es automatico en RAM (--cache-ram 1024)."
+echo "Ya no es necesario cargar/salvar manualmente."
 echo ""
-echo "[OK] Caché de contexto restaurado con éxito desde ~/llama-adreno/cache/slot0.bin"
+echo "Para ver el estado del cache:"
+echo "  curl -s http://127.0.0.1:8080/slots | python3 -m json.tool"

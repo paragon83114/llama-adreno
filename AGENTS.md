@@ -8,11 +8,10 @@ A wrapper around llama.cpp for running LLMs locally on Android/Termux with Adren
 
 - `setup.sh` — one-time bootstrap: installs deps, clones llama.cpp into `src/`, builds binaries, downloads Qwen2.5-Coder-1.5B-Instruct Q8_0 model.
 - `download-model.sh` — standalone script to download the model. Called by `setup.sh` and referenced in error messages if the model is missing.
-- `server.sh` — starts `llama-server` with GPU+CPU hybrid (Adreno 830 + 4 CPU threads), f16 KV cache, `-ngl 99`, batch 2048, ctx 16384. Auto-saves KV cache on Ctrl+C. Requires `LD_LIBRARY_PATH` to find Adreno OpenCL driver.
+- `server.sh` — starts `llama-server` with GPU+CPU hybrid (Adreno 830 + 4 CPU threads), f16 KV cache, `-ngl 99`, batch 2048, ctx 32764, prompt cache enabled. Requires `LD_LIBRARY_PATH` to find Adreno OpenCL driver.
 - `chat.sh` — interactive CLI chat with same GPU+CPU config but ctx-size 32764.
 - `load.sh` / `save.sh` — manual KV cache restore/save via the server HTTP API. **Requires `server.sh` to be running first.**
 - `models/` — GGUF model files. Active model: `qwen2.5-coder-1.5b-instruct-q8_0.gguf` (~1.76 GiB).
-- `cache/` — KV cache (`slot0.bin`). Auto-loaded on server start, auto-saved on server stop. f16 format.
 - `logs/` — server log files with symlink `server-latest.log`.
 - `backup/` — pre-OpenCL CPU-only binaries and scripts snapshot.
 - `src/` — llama.cpp git clone. Built binaries at `src/build/bin/llama-server` and `src/build/bin/llama-cli`.
@@ -26,6 +25,8 @@ A wrapper around llama.cpp for running LLMs locally on Android/Termux with Adren
 - Server listens on `http://127.0.0.1:8080`; OpenAI-compatible endpoint: `http://127.0.0.1:8080/v1`.
 - **KV cache format**: must match `-ctk`/`-ctv` flags. Currently f16. Do not mix with `q8_0`.
 - **OpenCL requires `LD_LIBRARY_PATH`**: scripts inject `/vendor/lib64` so the ICD loader can find `libOpenCL_adreno.so`. Without it, only the clvk/llvmpipe CPU emulator is available.
+- **Prompt cache**: enabled with `--cache-ram 1024 --cache-idle-slots --kv-unified`. After the first request, subsequent requests with the same system prompt are cached and ~240x faster (0.1s vs 25s prefill).
+- **`--parallel 1` is intentional**: the Adreno GPU cannot run concurrent OpenCL kernels. With `--parallel > 1`, concurrent requests degrade to ~0.3 t/s each. Single-slot with prompt cache gives the best UX for opencode/AI assistants.
 
 ## GPU acceleration (Adreno 830)
 
