@@ -36,7 +36,7 @@ printf "${CYAN}${BOLD}▗▖▘▐ ▘▐ ▐ ▘▐ ▗▗▖${RESET}  ${BOLD}l
 printf "${CYAN}${BOLD}▝▘ ▝ ▝▘▘ ▝▘ ▝▝ ▝▘${RESET}  ${DIM}Qwen2.5-Coder-1.5B · Adreno 830${RESET}\n"
 printf "\n"
 printf "  ${GREEN}▸${RESET} Modelo    ${DIM}$(basename "$MODELO")${RESET}\n"
-printf "  ${GREEN}▸${RESET} CPU       6 hilos · cores 0-5\n"
+printf "  ${GREEN}▸${RESET} CPU       4 hilos · cores 0-3\n"
 printf "  ${GREEN}▸${RESET} GPU       Adreno 830 · -ngl 99\n"
 printf "  ${GREEN}▸${RESET} GPU       Adreno 830 activa (prefill acelerado)\n"
 printf "\n"
@@ -44,9 +44,9 @@ printf "Escribe tu mensaje. Ctrl+C para salir.\n\n"
 
 LD_LIBRARY_PATH=/vendor/lib64:$PREFIX/lib:${LD_LIBRARY_PATH:-} "$LLAMA_BIN" \
     --model "$MODELO" \
-    --threads 6 \
-    --threads-batch 6 \
-    -C 0x3f --cpu-strict 1 \
+    --threads 4 \
+    --threads-batch 4 \
+    -C 0xf --cpu-strict 1 \
     -ngl 99 \
     -ctk f16 -ctv f16 \
     --batch-size 2048 \

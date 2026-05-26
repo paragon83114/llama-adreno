@@ -2,7 +2,7 @@
 
 Run LLMs locally on Android with **Adreno 830 GPU acceleration** via llama.cpp + OpenCL on Termux.
 
-This is the first documented setup running llama.cpp's OpenCL backend on Qualcomm's Adreno 830 (Snapdragon 8 Elite), achieving **579 t/s prefill** and **21.3 t/s token generation** with Qwen2.5-Coder-1.5B-Instruct Q8_0 on a tablet.
+This is the first documented setup running llama.cpp's OpenCL backend on Qualcomm's Adreno 830 (Snapdragon 8 Elite), achieving **562 t/s prefill** and **31.4 t/s token generation** with Qwen2.5-Coder-1.5B-Instruct Q8_0 on a tablet.
 
 ## Why this exists
 
@@ -23,7 +23,20 @@ This project packages all that knowledge into ready-to-use scripts.
 
 | Config | pp512 (t/s) | tg128 (t/s) |
 |--------|-------------|-------------|
-| GPU ngl=99, f16 KV, 6 threads | **579** | **21.3** |
+| GPU ngl=99, f16 KV, 2t (cores 0-1) | 571 ± 4 | 31.1 ± 0.1 |
+| GPU ngl=99, f16 KV, **4t (cores 0-3)** | **562 ± 12** | **31.4 ± 0.0** |
+| GPU ngl=99, f16 KV, 6t (cores 0-5) | 561 ± 13 | 30.5 ± 1.5 |
+
+Extended benchmarks (GPU ngl=99, f16 KV, 4 threads):
+
+| pp1280 (t/s) | pp2048 (t/s) | tg256 (t/s) |
+|-------------|--------------|-------------|
+| 507 ± 9 | 460 ± 3 | 26.6 ± 0.1 |
+
+CPU-only comparison:
+
+| Config | pp512 (t/s) | tg128 (t/s) |
+|--------|-------------|-------------|
 | CPU-only 6t, q8_0 KV, flash attn | 24.17 | 7.95 |
 
 **Qwen2.5-Coder-7B-Instruct Q4_K_M — Adreno 830 GPU offload**
@@ -32,9 +45,8 @@ This project packages all that knowledge into ready-to-use scripts.
 |--------|-------------|-------------|
 | GPU ngl=99, f16 KV | **89.19** | 6.60 |
 | GPU ngl=10, f16 KV | 28.63 | 6.82 |
-| CPU-only 6t, q8_0 KV, flash attn | 24.17 | **7.95** |
 
-Key takeaway: GPU offload gives **3-24x prefill speedup**. Token generation is slightly slower than CPU-only for larger models due to CPU-GPU sync overhead, but the massive prefill improvement makes it essential for interactive use (e.g. code assistants).
+Key takeaway: GPU offload gives **23x prefill speedup** over CPU-only. 4 threads is optimal — avoids cross-cluster latency while providing stable token generation. Token generation is slightly slower than CPU-only for larger models due to CPU-GPU sync overhead, but the massive prefill improvement makes it essential for interactive use (e.g. code assistants).
 
 ## Quick start
 
@@ -110,7 +122,7 @@ LD_LIBRARY_PATH=/vendor/lib64 clinfo -l
 
 ### Threading
 
-Snapdragon 8 Elite has 8 Oryon cores: 2 Prime (4.47 GHz) + 6 Performance (3.53 GHz). Using all 8 causes ~55% tg regression from cross-cluster synchronization. The optimal configuration is **6 threads pinned to performance cores** (`-C 0x3f`).
+Snapdragon 8 Elite has 8 Oryon cores: 2 Prime (4.47 GHz) + 6 Performance (3.53 GHz). Benchmarks show thread count barely impacts prefill with GPU offload, but more threads add variance to token generation due to cross-cluster synchronization. **4 threads pinned to cores 0-3 (`-C 0xf`) is optimal** — stable tg, leaves cores free for the system.
 
 ### Build flags
 

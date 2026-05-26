@@ -8,7 +8,7 @@ A wrapper around llama.cpp for running LLMs locally on Android/Termux with Adren
 
 - `setup.sh` — one-time bootstrap: installs deps, clones llama.cpp into `src/`, builds binaries, downloads Qwen2.5-Coder-1.5B-Instruct Q8_0 model.
 - `download-model.sh` — standalone script to download the model. Called by `setup.sh` and referenced in error messages if the model is missing.
-- `server.sh` — starts `llama-server` with GPU+CPU hybrid (Adreno 830 + 6 CPU threads), f16 KV cache, `-ngl 99`, batch 2048, ctx 16384. Auto-saves KV cache on Ctrl+C. Requires `LD_LIBRARY_PATH` to find Adreno OpenCL driver.
+- `server.sh` — starts `llama-server` with GPU+CPU hybrid (Adreno 830 + 4 CPU threads), f16 KV cache, `-ngl 99`, batch 2048, ctx 16384. Auto-saves KV cache on Ctrl+C. Requires `LD_LIBRARY_PATH` to find Adreno OpenCL driver.
 - `chat.sh` — interactive CLI chat with same GPU+CPU config but ctx-size 32764.
 - `load.sh` / `save.sh` — manual KV cache restore/save via the server HTTP API. **Requires `server.sh` to be running first.**
 - `models/` — GGUF model files. Active model: `qwen2.5-coder-1.5b-instruct-q8_0.gguf` (~1.76 GiB).
@@ -31,11 +31,17 @@ A wrapper around llama.cpp for running LLMs locally on Android/Termux with Adren
 
 The build includes `GGML_OPENCL=ON` with `GGML_OPENCL_USE_ADRENO_KERNELS=ON`. The Adreno 830 is detected via an ICD entry at `$PREFIX/etc/OpenCL/vendors/adreno.icd`.
 
-**Benchmark results (Qwen2.5-Coder-1.5B-Instruct Q8_0):**
+**Benchmark results (Qwen2.5-Coder-1.5B-Instruct Q8_0, build 549b9d8):**
 
 | Config | pp512 (t/s) | tg128 (t/s) |
 |--------|-------------|--------------|
-| GPU ngl=99, f16 KV, 6t | 579 | 21.3 |
+| GPU ngl=99, f16 KV, 4t (cores 0-3) | 562 ± 12 | 31.4 ± 0.0 |
+| GPU ngl=99, f16 KV, 2t (cores 0-1) | 571 ± 4 | 31.1 ± 0.1 |
+| GPU ngl=99, f16 KV, 6t (cores 0-5) | 561 ± 13 | 30.5 ± 1.5 |
+
+| Config | pp1280 (t/s) | pp2048 (t/s) | tg256 (t/s) |
+|--------|-------------|--------------|-------------|
+| GPU ngl=99, f16 KV, 4t | 507 ± 9 | 460 ± 3 | 26.6 ± 0.1 |
 
 | Config | pp512 (t/s) | tg128 (t/s) |
 |--------|-------------|--------------|
@@ -77,7 +83,7 @@ Binaries are shared libs (`libggml-opencl.so.*`, `libggml-cpu.so.*`, etc.) with 
 
 ## Threading
 
-Snapdragon 8 Elite (SM8750P) has 8 Oryon cores: 2 Prime (4.47 GHz) + 6 Performance (3.53 GHz). Using 8 threads causes ~55% regression in token generation due to cross-cluster synchronization. **6 threads pinned to cores 0-5 (`-C 0x3f`) is optimal** — these are the Performance cores which are faster for sequential workloads.
+Snapdragon 8 Elite (SM8750P) has 8 Oryon cores: 2 Prime (4.47 GHz) + 6 Performance (3.53 GHz). Using 8 threads causes ~55% regression in token generation due to cross-cluster synchronization. **4 threads pinned to cores 0-3 (`-C 0xf`) is optimal** — sufficient for KV cache ops alongside GPU, leaves cores free for the system, and avoids cross-cluster latency variance seen with 6 threads.
 
 ## Rebuilding
 

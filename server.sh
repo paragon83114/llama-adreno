@@ -47,7 +47,7 @@ printf "\n"
 
 printf "  ${GREEN}▸${RESET} Endpoint  ${BOLD}http://127.0.0.1:8080/v1${RESET}\n"
 printf "  ${GREEN}▸${RESET} Modelo    ${DIM}$(basename "$MODELO")${RESET}\n"
-printf "  ${GREEN}▸${RESET} CPU       6 hilos · cores 0-5 · máscara 0x3f\n"
+printf "  ${GREEN}▸${RESET} CPU       4 hilos · cores 0-3 · máscara 0xf\n"
 printf "  ${GREEN}▸${RESET} GPU       Adreno 830 · -ngl 99\n"
 printf "  ${GREEN}▸${RESET} KV Cache  f16 · ctx 16384\n"
 printf "  ${GREEN}▸${RESET} Log       ${DIM}${LOG_LATEST}${RESET}\n"
@@ -86,9 +86,9 @@ ln -sf "$LOG_FILE" "$LOG_LATEST"
 
 LD_LIBRARY_PATH=/vendor/lib64:$PREFIX/lib:${LD_LIBRARY_PATH:-} "$LLAMA_BIN" \
     --model "$MODELO" \
-    --threads 6 \
-    --threads-batch 6 \
-    -C 0x3f --cpu-strict 1 \
+    --threads 4 \
+    --threads-batch 4 \
+    -C 0xf --cpu-strict 1 \
     -ngl 99 \
     -ctk f16 -ctv f16 \
     --numa distribute \
