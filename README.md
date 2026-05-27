@@ -28,7 +28,7 @@ This project packages all that knowledge into ready-to-use scripts.
 | tg128 | **44.8 ± 0.2** |
 | tg256 | **39.4 ± 4.6** |
 
-Q4_0 es el formato óptimo para el backend OpenCL de Adreno — Qualcomm lo ha optimizado específicamente. Ver benchmarks comparativos con Q8_0 y Q4_K_M en [AGENTS.md](AGENTS.md).
+Q4_0 is the optimal format for Adreno's OpenCL backend — Qualcomm specifically optimized for it. See comparative benchmarks with Q8_0 and Q4_K_M in [AGENTS.md](AGENTS.md).
 
 CPU-only comparison:
 
@@ -83,7 +83,7 @@ curl -L -o models/qwen2.5-coder-1.5b-instruct-q4_0.gguf \
 bash server.sh
 ```
 
-The server starts at `http://127.0.0.1:8080` with an OpenAI-compatible API at `/v1`. Tras el primer request, el prompt cache acelera requests subsecuentes ~240x.
+The server starts at `http://127.0.0.1:8080` with an OpenAI-compatible API at `/v1`. After the first request, the prompt cache accelerates subsequent requests ~240x.
 
 ### 4. Chat interactively
 
@@ -145,7 +145,7 @@ cmake -B build \
   -DLLAMA_OPENSSL=OFF
 ```
 
-ARM architecture flags (`dotprod`, `fp16`, `i8mm`) and KleidiAI provide significant CPU-side speedups. `GGML_OPENCL_USE_ADRENO_KERNELS=ON` enables Qualcomm-optimized kernel paths. `GGML_SCHED_NO_REALLOC=ON` mejora token generation +16%.
+ARM architecture flags (`dotprod`, `fp16`, `i8mm`) and KleidiAI provide significant CPU-side speedups. `GGML_OPENCL_USE_ADRENO_KERNELS=ON` enables Qualcomm-optimized kernel paths. `GGML_SCHED_NO_REALLOC=ON` improves token generation by +16%.
 
 ### posix_spawn polyfill
 
@@ -156,7 +156,7 @@ Android/Termux lacks `posix_spawn`. `setup.sh` writes a compatibility shim (`spa
 - **Format**: f16 (required for OpenCL — `q8_0` triggers `SET_ROWS` crash)
 - **Auto-save**: `server.sh` saves KV cache on Ctrl+C (SIGINT handler)
 - **Auto-load**: Server loads existing cache on startup
-- **Prompt cache**: enabled with `--cache-ram 1024`. Tras el primer request con system prompt, los siguientes son ~240x más rápidos (0.1s vs 25s).
+- **Prompt cache**: enabled with `--cache-ram 1024`. After the first request with a system prompt, subsequent requests are ~240x faster (0.1s vs 25s).
 - **Manual**: Use `save.sh` / `load.sh` while the server is running
 
 ## Known limitations
