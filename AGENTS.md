@@ -6,12 +6,12 @@ A wrapper around llama.cpp for running LLMs locally on Android/Termux with Adren
 
 ## Directory layout
 
-- `setup.sh` — one-time bootstrap: installs deps, clones llama.cpp into `src/`, builds binaries, downloads Qwen2.5-Coder-1.5B-Instruct Q8_0 model.
+- `setup.sh` — one-time bootstrap: installs deps, clones llama.cpp into `src/`, builds binaries, downloads Qwen2.5-Coder-1.5B-Instruct Q4_K_M model.
 - `download-model.sh` — standalone script to download the model. Called by `setup.sh` and referenced in error messages if the model is missing.
 - `server.sh` — starts `llama-server` with GPU+CPU hybrid (Adreno 830 + 4 CPU threads), f16 KV cache, `-ngl 99`, batch 2048, ctx 32764, prompt cache enabled. Requires `LD_LIBRARY_PATH` to find Adreno OpenCL driver.
 - `chat.sh` — interactive CLI chat with same GPU+CPU config but ctx-size 32764.
 - `load.sh` / `save.sh` — manual KV cache restore/save via the server HTTP API. **Requires `server.sh` to be running first.**
-- `models/` — GGUF model files. Active model: `qwen2.5-coder-1.5b-instruct-q8_0.gguf` (~1.76 GiB).
+- `models/` — GGUF model files. Active model: `qwen2.5-coder-1.5b-instruct-q4_k_m.gguf` (~1.04 GiB).
 - `logs/` — server log files with symlink `server-latest.log`.
 - `backup/` — pre-OpenCL CPU-only binaries and scripts snapshot.
 - `src/` — llama.cpp git clone. Built binaries at `src/build/bin/llama-server` and `src/build/bin/llama-cli`.
@@ -39,10 +39,12 @@ The build includes `GGML_OPENCL=ON` with `GGML_OPENCL_USE_ADRENO_KERNELS=ON`. Th
 | GPU ngl=99, f16 KV, 4t (cores 0-3) | 562 ± 12 | 31.4 ± 0.0 |
 | GPU ngl=99, f16 KV, 2t (cores 0-1) | 571 ± 4 | 31.1 ± 0.1 |
 | GPU ngl=99, f16 KV, 6t (cores 0-5) | 561 ± 13 | 30.5 ± 1.5 |
+| GPU ngl=99, f16 KV, 4t, XMEM_GEMM=1 | **570 ± 7** | **30.7 ± 0.2** |
 
 | Config | pp1280 (t/s) | pp2048 (t/s) | tg256 (t/s) |
 |--------|-------------|--------------|-------------|
 | GPU ngl=99, f16 KV, 4t | 507 ± 9 | 460 ± 3 | 26.6 ± 0.1 |
+| GPU ngl=99, f16 KV, 4t, XMEM_GEMM=1 | — | **482 ± 5** | **30.1 ± 1.4** |
 
 | Config | pp512 (t/s) | tg128 (t/s) |
 |--------|-------------|--------------|
@@ -78,7 +80,11 @@ Current cmake flags (as of latest rebuild):
 -DLLAMA_BUILD_TESTS=OFF
 -DLLAMA_BUILD_SERVER=ON
 -DLLAMA_BUILD_APP=OFF
+-DLLAMA_BUILD_UI=OFF
+-DLLAMA_OPENSSL=OFF
 ```
+
+Runtime environment: `GGML_OPENCL_ADRENO_XMEM_GEMM=1` enables Adreno-specific F16xF32 GEMM with temporary weight prepack (set in `server.sh`).
 
 Binaries are shared libs (`libggml-opencl.so.*`, `libggml-cpu.so.*`, etc.) with RUNPATH set to `src/build/bin`.
 
@@ -107,7 +113,9 @@ cd ~/llama-adreno/src && cmake -B build \
   -DOpenCL_LIBRARY=$PREFIX/lib/libOpenCL.so \
   -DLLAMA_BUILD_TESTS=OFF \
   -DLLAMA_BUILD_SERVER=ON \
-  -DLLAMA_BUILD_APP=OFF
+  -DLLAMA_BUILD_APP=OFF \
+  -DLLAMA_BUILD_UI=OFF \
+  -DLLAMA_OPENSSL=OFF
 cmake --build build --config Release -j$(nproc) --target llama-server --target llama-cli --target llama-bench
 ```
 

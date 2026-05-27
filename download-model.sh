@@ -1,10 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
-MODELO_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q8_0.gguf"
+MODELO_URL="https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
 MODELO_DIR="$HOME/llama-adreno/models"
-MODELO_FILE="$MODELO_DIR/qwen2.5-coder-1.5b-instruct-q8_0.gguf"
-MODELO_SIZE="1.8GiB"
+MODELO_FILE="$MODELO_DIR/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"
+MODELO_SIZE="1.0GiB"
 
 BOLD="\033[1m"
 DIM="\033[2m"
@@ -22,7 +22,7 @@ printf "\n${CYAN}${BOLD}▗▖▗▖▗▖▖▗▖▗▗▖▗▖${RESET}\n"
 printf "${CYAN}${BOLD}▗▖▘▐ ▘▐ ▐ ▘▐ ▗▗▖${RESET}  ${BOLD}Descarga de modelo${RESET}\n"
 printf "${CYAN}${BOLD}▝▘ ▝ ▝▘▘ ▝▘ ▝▝ ▝▘${RESET}\n"
 printf "\n"
-printf "  Modelo:  Qwen2.5-Coder-1.5B-Instruct Q8_0\n"
+printf "  Modelo:  Qwen2.5-Coder-1.5B-Instruct Q4_K_M\n"
 printf "  Tamaño:  ~%s\n" "$MODELO_SIZE"
 printf "  Destino: ${DIM}%s${RESET}\n\n" "$MODELO_FILE"
 

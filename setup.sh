@@ -259,7 +259,9 @@ SPAWN_H
         -DOpenCL_LIBRARY="$PREFIX/lib/libOpenCL.so" \
         -DLLAMA_BUILD_TESTS=OFF \
         -DLLAMA_BUILD_SERVER=ON \
-        -DLLAMA_BUILD_APP=OFF
+        -DLLAMA_BUILD_APP=OFF \
+        -DLLAMA_BUILD_UI=OFF \
+        -DLLAMA_OPENSSL=OFF
 
     cmake --build build --config Release -j"$(nproc)" --target llama-server --target llama-cli
 
