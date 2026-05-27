@@ -45,7 +45,7 @@ printf "\n"
 printf "  ${GREEN}▸${RESET} Endpoint  ${BOLD}http://127.0.0.1:8080/v1${RESET}\n"
 printf "  ${GREEN}▸${RESET} Modelo    ${DIM}$(basename "$MODELO")${RESET}\n"
 printf "  ${GREEN}▸${RESET} CPU       4 hilos · cores 0-3 · máscara 0xf\n"
-printf "  ${GREEN}▸${RESET} GPU       Adreno 830 · -ngl 99\n"
+printf "  ${GREEN}▸${RESET} GPU       Adreno 830 · -ngl 99 · ubatch 256\n"
 printf "  ${GREEN}▸${RESET} KV Cache  f16 · ctx 16384 · cache-reuse 256 · ubatch 1024 · poll 20ms\n"
 printf "  ${GREEN}▸${RESET} Slots     1 (dedicado, sin competencia GPU)\n"
 printf "  ${GREEN}▸${RESET} Persist   ${DIM}$HOME/llama-adreno/cache/${RESET}\n"
@@ -90,8 +90,8 @@ LD_LIBRARY_PATH=/vendor/lib64:$PREFIX/lib:${LD_LIBRARY_PATH:-} "$LLAMA_BIN" \
     -C 0xf --cpu-strict 1 \
     -ngl 99 \
     -ctk f16 -ctv f16 \
-    --batch-size 2048 \
-    --ubatch-size 1024 \
+    --batch-size 512 \
+    --ubatch-size 256 \
     --ctx-size 16384 \
     --parallel 1 \
     --cont-batching \
