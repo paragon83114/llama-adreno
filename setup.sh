@@ -256,12 +256,17 @@ SPAWN_H
         -DGGML_CPU_REPACK=ON \
         -DGGML_OPENCL=ON \
         -DGGML_OPENCL_USE_ADRENO_KERNELS=ON \
+        -DGGML_SCHED_NO_REALLOC=ON \
         -DOpenCL_LIBRARY="$PREFIX/lib/libOpenCL.so" \
         -DLLAMA_BUILD_TESTS=OFF \
         -DLLAMA_BUILD_SERVER=ON \
         -DLLAMA_BUILD_APP=OFF \
         -DLLAMA_BUILD_UI=OFF \
-        -DLLAMA_OPENSSL=OFF
+        -DLLAMA_OPENSSL=OFF \
+        -DGGML_ACCELERATE=OFF \
+        -DGGML_AVX2=OFF -DGGML_AVX=OFF -DGGML_AVX512=OFF \
+        -DGGML_SSE42=OFF -DGGML_F16C=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF \
+        -DGGML_RVV=OFF -DGGML_LASX=OFF -DGGML_LSX=OFF
 
     cmake --build build --config Release -j"$(nproc)" --target llama-server --target llama-cli
 

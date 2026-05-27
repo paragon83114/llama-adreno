@@ -11,7 +11,7 @@ A wrapper around llama.cpp for running LLMs locally on Android/Termux with Adren
 - `server.sh` — starts `llama-server` with GPU+CPU hybrid (Adreno 830 + 4 CPU threads), f16 KV cache, `-ngl 99`, batch 2048, ctx 32764, prompt cache enabled. Requires `LD_LIBRARY_PATH` to find Adreno OpenCL driver.
 - `chat.sh` — interactive CLI chat with same GPU+CPU config but ctx-size 32764.
 - `load.sh` / `save.sh` — manual KV cache restore/save via the server HTTP API. **Requires `server.sh` to be running first.**
-- `models/` — GGUF model files. Active model: `qwen2.5-coder-1.5b-instruct-q4_k_m.gguf` (~1.04 GiB).
+- `models/` — GGUF model files. Active model: `qwen2.5-coder-1.5b-instruct-q4_0.gguf` (~1.01 GiB).
 - `logs/` — server log files with symlink `server-latest.log`.
 - `backup/` — pre-OpenCL CPU-only binaries and scripts snapshot.
 - `src/` — llama.cpp git clone. Built binaries at `src/build/bin/llama-server` and `src/build/bin/llama-cli`.
@@ -32,25 +32,47 @@ A wrapper around llama.cpp for running LLMs locally on Android/Termux with Adren
 
 The build includes `GGML_OPENCL=ON` with `GGML_OPENCL_USE_ADRENO_KERNELS=ON`. The Adreno 830 is detected via an ICD entry at `$PREFIX/etc/OpenCL/vendors/adreno.icd`.
 
-**Benchmark results (Qwen2.5-Coder-1.5B-Instruct Q8_0, build 549b9d8):**
+**Benchmark results (Qwen2.5-Coder-1.5B-Instruct, build 549b9d8, XMEM_GEMM=1):**
+
+### Q4_0 (modelo activo, optimizado por Qualcomm para OpenCL)
+
+| Test | t/s |
+|:----:|:---:|
+| pp512 | **663 ± 11** |
+| pp2048 | **535 ± 13** |
+| tg128 | **38.7 ± 0.2** |
+| tg256 | **44.4 ± 0.2** |
+
+### Q4_K_M (referencia)
+
+| Test | t/s |
+|:----:|:---:|
+| pp512 | 444 ± 6 |
+| pp2048 | 384 ± 7 |
+| tg128 | 37.6 ± 0.1 |
+| tg256 | 35.3 ± 4.2 |
+
+### Q8_0 (referencia)
+
+| Test | t/s |
+|:----:|:---:|
+| pp512 | 570 ± 7 |
+| pp2048 | 482 ± 5 |
+| tg128 | 31.4 ± 0.0 |
+| tg256 | 30.1 ± 1.4 |
+
+### CPU y modelos grandes (referencia)
 
 | Config | pp512 (t/s) | tg128 (t/s) |
 |--------|-------------|--------------|
-| GPU ngl=99, f16 KV, 4t (cores 0-3) | 562 ± 12 | 31.4 ± 0.0 |
-| GPU ngl=99, f16 KV, 2t (cores 0-1) | 571 ± 4 | 31.1 ± 0.1 |
-| GPU ngl=99, f16 KV, 6t (cores 0-5) | 561 ± 13 | 30.5 ± 1.5 |
-| GPU ngl=99, f16 KV, 4t, XMEM_GEMM=1 | **570 ± 7** | **30.7 ± 0.2** |
+| CPU-only 6t, q8_0 KV, flash attn | 24.17 | 7.95 |
+| GPU ngl=99, f16 KV (7B Q4_0) | 89.19 | 6.60 |
 
-| Config | pp1280 (t/s) | pp2048 (t/s) | tg256 (t/s) |
-|--------|-------------|--------------|-------------|
-| GPU ngl=99, f16 KV, 4t | 507 ± 9 | 460 ± 3 | 26.6 ± 0.1 |
-| GPU ngl=99, f16 KV, 4t, XMEM_GEMM=1 | — | **482 ± 5** | **30.1 ± 1.4** |
+### Optimizaciones aplicadas
 
-| Config | pp512 (t/s) | tg128 (t/s) |
-|--------|-------------|--------------|
-| CPU-only 6t, q8_0 KV, flash attn | 24.17 | **7.95** |
-| GPU ngl=99, f16 KV (7B model) | **89.19** | 6.60 |
-| GPU ngl=10, f16 KV (7B model) | 28.63 | 6.82 |
+- **SCHED_NO_REALLOC=ON**: tg128 mejora +16% (38.7 → 44.8 t/s) sin impacto en pp
+- **GGML_OPENCL_ADRENO_XMEM_GEMM=1**: ~5% mejora en pp y tg (env var en server.sh)
+- **Q4_0**: formato optimizado por Qualcomm para OpenCL (vs Q4_K_M no optimizado)
 
 - GPU offload gives major prefill speedup on all model sizes
 - **KV cache must be f16** with GPU offload — `q8_0` causes a `SET_ROWS` crash on the OpenCL backend.
@@ -75,6 +97,7 @@ Current cmake flags (as of latest rebuild):
 -DGGML_CPU_REPACK=ON
 -DGGML_OPENCL=ON
 -DGGML_OPENCL_USE_ADRENO_KERNELS=ON
+-DGGML_SCHED_NO_REALLOC=ON
 -DOpenCL_LIBRARY=$PREFIX/lib/libOpenCL.so   # ICD loader, not vendor driver
 -DCMAKE_BUILD_TYPE=Release
 -DLLAMA_BUILD_TESTS=OFF
@@ -82,6 +105,11 @@ Current cmake flags (as of latest rebuild):
 -DLLAMA_BUILD_APP=OFF
 -DLLAMA_BUILD_UI=OFF
 -DLLAMA_OPENSSL=OFF
+# Backends deshabilitados (no aplican en ARM64):
+-DGGML_ACCELERATE=OFF   # Apple
+-DGGML_AVX2=OFF -DGGML_AVX=OFF -DGGML_AVX512=OFF  # x86
+-DGGML_SSE42=OFF -DGGML_F16C=OFF -DGGML_FMA=OFF -DGGML_BMI2=OFF  # x86
+-DGGML_RVV=OFF -DGGML_LASX=OFF -DGGML_LSX=OFF  # RISC-V / LoongArch
 ```
 
 Runtime environment: `GGML_OPENCL_ADRENO_XMEM_GEMM=1` enables Adreno-specific F16xF32 GEMM with temporary weight prepack (set in `server.sh`).
@@ -110,6 +138,7 @@ cd ~/llama-adreno/src && cmake -B build \
   -DGGML_CPU_REPACK=ON \
   -DGGML_OPENCL=ON \
   -DGGML_OPENCL_USE_ADRENO_KERNELS=ON \
+  -DGGML_SCHED_NO_REALLOC=ON \
   -DOpenCL_LIBRARY=$PREFIX/lib/libOpenCL.so \
   -DLLAMA_BUILD_TESTS=OFF \
   -DLLAMA_BUILD_SERVER=ON \
