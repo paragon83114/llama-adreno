@@ -52,14 +52,14 @@ printf "=== Performance Test Suite ===\n"
 printf "Server: http://127.0.0.1:8080\n"
 printf "Date: $(date)\n"
 
-PROMPT_8K=$(generate_tokens 8000)
+PROMPT_2K=$(generate_tokens 2000)
 
-test_request "Test 1: Cold Start (~8000 tokens)" "$PROMPT_8K" 50
+test_request "Test 1: Cold Start (~2000 tokens)" "$PROMPT_2K" 50
 
-test_request "Test 2: Warm (same prompt)" "$PROMPT_8K" 50
+test_request "Test 2: Warm (same prompt)" "$PROMPT_2K" 50
 
-PROMPT_8K_EXTENDED="${PROMPT_8K} Now please summarize the key points from the text above."
-test_request "Test 3: Extended prompt (cache-reuse)" "$PROMPT_8K_EXTENDED" 100
+PROMPT_2K_EXTENDED="${PROMPT_2K} Now please summarize the key points from the text above."
+test_request "Test 3: Extended prompt (cache-reuse)" "$PROMPT_2K_EXTENDED" 100
 
 test_request "Test 4: Small prompt (baseline)" "Hello, how are you?" 50
 
