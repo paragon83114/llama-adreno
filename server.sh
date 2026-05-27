@@ -102,7 +102,8 @@ LD_LIBRARY_PATH=/vendor/lib64:$PREFIX/lib:${LD_LIBRARY_PATH:-} "$LLAMA_BIN" \
     --keep -1 \
     --slot-save-path "$CACHE_DIR" \
     --poll 20 \
-    --timeout 600 \
+    --timeout 180 \
+    --no-warmup \
     --host 127.0.0.1 \
     --port 8080 \
     >> "$LOG_FILE" 2>&1 &
